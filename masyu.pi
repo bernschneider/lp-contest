@@ -1,0 +1,229 @@
+/* LPCP Contest 2020 Problem 4: Masyu
+by Peter Bernschneider
+https://github.com/alviano/lpcp-contest-2020/tree/master/problem-4 */
+import util, sat.
+
+convert(Line) = map(Line.split(" "), to_int). % convert an input line to a list of integers
+
+run(Problem) =>
+    Inp = read_file_lines("instance." ++ to_string(Problem) ++ ".in"),
+    Params = Inp[1].convert(), N = Params[1] + 1, N1 = N + 1, 
+    NW = Params[2], NB = Params[3], % number of white and black circles
+    CoordW = map(Inp[2..1+NW], convert),
+    CoordB = map(Inp[2+NW..1+NW+NB], convert),
+    C = new_array(N,N), foreach(Z in 1..N, S in 1..N) C[Z,S] = 0 end, % constraints
+    foreach([Z,S] in CoordB) C[1+Z,1+S] := 1 end,
+    foreach([Z,S] in CoordW) C[1+Z,1+S] := 2 end,
+    X = new_array(N1,N1), X :: [0,1], % X=1 iff the cell is inside the circuit
+    % Arround the given N x N grid we include a border of zeros:
+    foreach(Z in 1..N1) X[Z,1] #= 0, X[Z,N1] #= 0 end, % first and last column are only zeros
+    foreach(S in 1..N1) X[1,S] #= 0, X[N1,S] #= 0 end, % first and last row are only zeros
+    M = new_array(N,N), M :: 0..4, % M counts the X's in each 2x2 square
+    foreach(Z in 1..N, S in 1..N) M[Z,S] #= X[Z,S] + X[Z,S+1] + X[Z+1,S] + X[Z+1,S+1] end,
+    % Now establish the turn/ straight constraints:
+    foreach(Z in 1..N, S in 1..N)
+        if C[Z,S]=2 then M[Z,S] #= 2,         % Constraint White Point
+            if (1<S,S<N) then X[Z,S] #= X[Z,S+1] #=> M[Z,S-1] mod 2 #= 1 #\/ M[Z,S+1] mod 2 #= 1 else X[Z,S] #!= X[Z,S+1] end,
+            if (1<Z,Z<N) then X[Z,S] #= X[Z+1,S] #=> M[Z-1,S] mod 2 #= 1 #\/ M[Z+1,S] mod 2 #= 1 else X[Z,S] #!= X[Z+1,S] end
+        elseif C[Z,S]=1 then M[Z,S] :: [1,3], % Constraint Black Point
+            if Z>1 then X[Z,S] #= (M[Z,S] #= 1) #=> M[Z-1,S] #= 2 else X[Z,S] #!= (M[Z,S] #= 1) end,
+            if S>1 then X[Z,S] #= (M[Z,S] #= 1) #=> M[Z,S-1] #= 2 else X[Z,S] #!= (M[Z,S] #= 1) end,
+            if S>1 then X[Z+1,S] #= (M[Z,S] #= 1) #=> M[Z,S-1] #= 2 end,
+            if Z<N then X[Z+1,S] #= (M[Z,S] #= 1) #=> M[Z+1,S] #= 2 end,
+            if Z>1 then X[Z,S+1] #= (M[Z,S] #= 1) #=> M[Z-1,S] #= 2 else X[Z,S+1] #!= (M[Z,S] #= 1) end,
+            if S<N then X[Z,S+1] #= (M[Z,S] #= 1) #=> M[Z,S+1] #= 2 else X[Z,S+1] #!= (M[Z,S] #= 1) end,
+            if S<N then X[Z+1,S+1] #= (M[Z,S] #= 1) #=> M[Z,S+1] #= 2 else X[Z+1,S+1] #!= (M[Z,S] #= 1) end,
+            if Z<N then X[Z+1,S+1] #= (M[Z,S] #= 1) #=> M[Z+1,S] #= 2 else X[Z+1,S+1] #!= (M[Z,S] #= 1) end
+        end
+    end,
+    % The circuit passes no cell more than once:
+	foreach(Z in 1..N, S in 1..N)
+		(X[Z,S] #= 1 #/\ X[Z+1,S+1] #= 1) #=> (X[Z,S+1] #= 1 #\/ X[Z+1,S] #= 1),
+		(X[Z,S+1] #= 1 #/\ X[Z+1,S] #= 1) #=> (X[Z,S]   #= 1 #\/ X[Z+1,S+1] #= 1)
+    end,
+    % The X's must be connected:  We define a root cell with distance 0 and measure the distance of each other cell.
+    % To avoid holes in the X-area also the outer area must be othogonally connected; here we chose (1,1) as root: 
+    Dist = new_array(N1,N1), MaxDist = N * N, Dist :: 0..MaxDist, 
+    Center = N // 2, [RootZ, RootS] :: Center-5..Center+5,
+    matrix_element(X, RootZ, RootS, 1), % the root cell for X is inside the circuit
+    matrix_element(Dist, RootZ, RootS, 0), Dist[1,1] #= 0,
+    foreach(Z in 1..N1, S in 1..N1, (Z,S)!=(1,1))
+   	  	(Z #!= RootZ #\/ S #!= RootS) #=>  
+            Dist[Z,S] #= 1 + min([ Dist[Z1,S1] * (X[Z,S] #= X[Z1,S1]) + MaxDist * (X[Z,S] #!= X[Z1,S1])
+   	  	    : (Z1,S1) in [(Z-1,S), (Z,S-1), (Z,S+1), (Z+1,S)], Z1 >= 1, Z1 =< N1, S1 >= 1, S1 =< N1])
+    end,
+    solve(vars(X) ++ vars(M) ++ [RootZ, RootS] ++ vars(Dist)),  
+    foreach(Z in 2..N, S in 2..N)
+		if X[Z,S]=1 then print("X|") else printf(" |") end, if S = N then nl end
+    end,
+    Horizontal = [{Z,S} : Z in 1..N, S in 1..N, X[Z,S]!=X[Z+1,S]],
+    Vertical =   [{Z,S} : Z in 1..N, S in 1..N, X[Z,S]!=X[Z,S+1]],
+    Out = open("instance." ++ to_string(Problem) ++ ".out", write),
+    writeln(Out, len(Horizontal)), foreach({Z,S} in Horizontal) writef(Out, "%d %d%n", Z-1, S-2) end,
+    writeln(Out, len(Vertical)),   foreach({Z,S} in Vertical)   writef(Out, "%d %d%n", Z-2, S-1) end,
+    close(Out).
+
+main =>
+    foreach(P in 0..5) run(P) end. 
+/* Picat> time(run(0))
+ | | |X|X|
+X|X|X|X|X|
+X| | | | |
+X| | |X| |
+X|X|X|X| |
+CPU time 0.427 seconds.
+
+Picat> time(run(1))
+X|X|X|X|X| |X|X|X|X|X|X| |X|
+X|X| | | | | | | | | |X| |X|
+ |X| | | | |X|X| |X|X|X| |X|
+ |X|X|X|X| |X|X| |X| |X|X|X|
+X|X|X|X|X| |X|X| |X| | | | |
+X| | | |X| |X|X|X|X|X| |X|X|
+X| | | |X| | | | | |X| |X|X|
+X|X|X| |X|X|X|X| | |X| |X| |
+ | |X| |X| | |X| | |X|X|X| |
+X| |X| |X| | |X| | | | |X| |
+X| | | | | |X|X|X|X|X| |X|X|
+X|X|X|X|X| |X| |X| |X| | |X|
+X|X| | |X| |X| |X| |X|X|X|X|
+X|X| | |X|X|X| |X| |X|X|X|X|
+CPU time 25.378 seconds.
+
+Picat> time(run(2))
+ |X|X|X|X|X|X| |X| |X|X|X|X|X|X|X|X| |X|X|X|X| |
+ |X| | | |X|X| |X|X|X| | | | | | |X| |X| | | | |
+ |X| | | | | | | | | | | | |X|X|X|X| |X|X|X|X|X|
+X|X|X|X|X| |X|X|X| |X|X|X| |X| |X| | | | | |X| |
+X|X| |X|X| |X| |X| |X| | | |X| |X|X|X|X|X| |X| |
+ | | |X|X|X|X| |X|X|X|X|X| |X| | | |X| | | |X|X|
+X|X|X|X| | | | | | | |X|X| | | |X|X|X|X|X| | |X|
+X|X|X|X| |X|X| |X|X| |X|X| | | |X| | | |X| | |X|
+X| | |X| |X|X| | |X| | | | |X|X|X| |X| |X| | |X|
+X| | |X| | |X|X|X|X| | | | |X|X|X|X|X| |X| | |X|
+ | | |X|X| | |X|X|X|X|X|X|X|X| | | | | |X|X|X|X|
+X| | | |X|X| | | | |X| | | | | |X|X|X| | | | |X|
+X|X|X|X|X|X| |X|X|X|X| |X|X|X|X|X| |X| |X| |X|X|
+ | |X| | | | | | | |X| |X|X| | |X| |X| |X| |X| |
+ | |X|X|X|X|X| |X|X|X| | |X| |X|X| |X|X|X| |X| |
+X|X|X| | | |X|X|X| |X|X|X|X| | | | | | |X| |X| |
+X| |X| | | | | |X| | | | |X| | |X|X| | |X| |X|X|
+X| | | | |X|X| | | | | | |X|X|X|X|X| | | | | |X|
+X|X|X|X| |X|X|X|X| | |X| |X|X| | | | | |X|X|X|X|
+ | | |X| |X| | |X| | |X| | |X| | | | | |X| | | |
+X|X| |X| |X| | |X| | |X| | |X|X|X| |X|X|X| |X|X|
+X|X| |X|X|X| | |X|X|X|X|X| |X| | | |X| | | |X|X|
+X|X| | | | | | | | | |X|X| |X|X| |X|X| | | |X| |
+X|X|X|X|X|X|X|X|X|X|X|X|X| |X|X| |X|X|X|X|X|X| |
+CPU time 349.436 seconds.
+
+Picat> time(run(3))
+X|X|X| | | | |X|X| |X| | | | |X|X|X| |X| |X|X|X|X|X|X|X|X|
+X| | | |X|X| |X|X| |X|X|X|X|X|X| |X|X|X| | | | |X| | |X|X|
+X| | | |X|X| |X| | | | |X| | | | |X| | | |X|X|X|X| | |X| |
+X|X|X|X|X|X| |X|X| | | |X| |X|X|X|X|X|X|X|X| | | | | |X|X|
+X| | | | |X| | |X| |X|X|X| | | |X| | | |X|X| |X|X|X| | |X|
+X| | | | |X|X|X|X| |X| | | | | | | |X| |X| | | | |X|X|X|X|
+X|X|X| | |X| | | | |X| |X|X|X|X| | |X| |X|X|X|X| |X| | | |
+ | | | |X|X| |X|X|X|X| |X| | | | | |X| | | | |X| |X| |X|X|
+X|X|X| |X| | | | |X| | |X|X|X|X|X| |X|X|X|X| | | | | |X| |
+ | |X| |X|X|X|X| |X|X|X|X| | | |X| | | | |X|X|X|X|X|X|X|X|
+X|X|X| | | | |X| |X| | | | |X| |X|X|X|X| |X| | |X| | | |X|
+X| | | | | | |X| |X|X|X|X| |X| | | | |X| |X| | |X| | | |X|
+X|X|X|X| |X|X|X| | | |X|X| |X|X|X|X| |X| | | | |X| |X|X|X|
+ |X| | | |X|X|X| | | |X|X| | | | |X| |X| | |X|X|X| |X| | |
+ |X| | | | | |X|X|X| | |X| | | | |X| | | | |X| | | |X| |X|
+X|X|X| | | | |X| | | | |X|X|X|X|X|X| | | | |X| | | | | |X|
+X| |X| | |X|X|X|X|X|X| | | | | | |X|X|X|X| |X|X|X|X|X|X|X|
+ | |X|X|X|X| | | | |X|X|X|X|X|X| | | | |X| | |X| | |X| | |
+X|X|X| | | | |X| | |X| | |X| |X| | |X| |X|X|X|X| | |X| | |
+X| | | |X|X|X|X|X|X|X| | |X| |X|X|X|X| |X|X| | | | |X|X|X|
+X| | | | | | |X| | | | | | | | | | | | |X|X| | | | | | |X|
+X|X|X| | | | |X| | |X|X|X| |X|X| |X|X|X|X|X|X|X|X|X| |X|X|
+ | | | |X|X|X|X| | |X| |X|X|X|X| |X|X| | | |X|X|X|X| | | |
+ | | | |X| | |X|X|X|X| |X|X| | | |X|X| |X| |X| |X|X|X|X|X|
+ |X|X|X|X| | |X| | | | | | | |X|X|X|X| |X| |X| |X|X| | |X|
+ |X| | | | | |X|X|X|X|X|X| | |X| |X|X| |X|X|X| | | | | |X|
+ |X| | |X|X|X|X| | |X| |X| | |X| | | | | | | | | |X|X|X|X|
+X|X|X| |X|X| | | | |X| |X|X|X|X|X| | |X|X|X|X| | |X| |X| |
+X|X|X| |X|X| |X|X|X|X| | | | |X|X| | | | | |X|X|X|X| |X|X|
+CPU time 147.039 seconds.
+
+Picat> time(run(4))
+X|X|X|X|X|X| |X|X| | |X|X| |X|X|X| | | | |X|X|X|X|X|X|X| |X| | |X|X|
+X| | | | |X| | |X|X|X|X| | | | |X|X|X|X|X|X| | | |X| | | |X|X|X|X|X|
+X| | |X|X|X| | |X| | |X| | |X| |X| | | | | | | | |X| |X|X|X| | | |X|
+X|X| |X| | | | |X| | |X| | |X| | | |X| | | |X|X|X|X| |X| | | | | |X|
+ | | |X| |X|X|X|X| | |X|X|X|X|X|X|X|X| |X|X|X| | | | | | |X| |X|X|X|
+X|X|X|X| |X| | | | | | | | | |X| | |X|X|X| | | |X| |X|X|X|X| |X| | |
+X| | | | |X| |X|X|X| | | | | |X| | | | |X| | | |X|X|X| | |X|X|X| |X|
+X| |X|X|X|X| | | |X| | |X|X| | | | | | |X|X|X|X|X| |X| | | | | | |X|
+X| |X| | | | | | |X|X|X|X|X| |X|X|X| | |X| | | | | |X|X|X| |X|X|X|X|
+X| |X| | | |X|X|X|X|X|X| | | |X|X|X| |X|X| |X|X|X| | | | | |X| | | |
+X| |X|X|X| | | | | | |X| | | | | |X| |X|X| |X| |X|X|X| | | |X| | | |
+X|X|X|X|X| |X|X|X|X| |X| |X|X|X| |X| | |X| |X| | | |X| | |X|X|X|X|X|
+X|X| | | | |X| | | | |X| |X| | | |X| | |X| | | | | |X| | |X| |X| | |
+ | | | | | |X| | |X|X|X|X|X| |X|X|X|X| |X|X|X| |X| |X|X|X|X| |X| | |
+X|X|X| |X|X|X| | |X| | | | | | | | |X| | |X| | |X| | | | | | |X|X|X|
+X| | | |X| | | |X|X|X|X| |X| |X|X| |X| | |X| | |X| | |X|X|X| | | |X|
+X| | | |X| | | |X| | |X| |X| |X|X| |X|X| |X|X|X|X|X|X|X| | | |X|X|X|
+X|X|X|X|X| |X| |X| | |X| |X| |X| | |X|X| | | | |X| | |X| |X| | | |X|
+ |X| | | | |X| |X| | | | |X|X|X|X| |X|X|X|X|X|X|X|X| |X| |X|X|X|X|X|
+ |X| | | | |X|X|X|X|X| | | | | |X| | | |X| | |X| |X| | | | | | | |X|
+ |X|X|X|X| | | |X|X|X| |X|X|X| |X| | | |X| | |X| |X|X|X|X|X| |X|X|X|
+ | | | |X| | | | | |X| | | |X| |X|X|X|X|X| |X|X| |X|X|X| |X| | |X| |
+X|X| | |X|X|X|X| | |X|X|X| |X| | |X| | | | | | | | | | | |X|X|X|X| |
+X|X| | |X| | |X| | | | |X| |X|X|X|X| |X|X|X| |X|X| |X|X|X|X| | | | |
+ |X| |X|X|X| |X|X|X|X|X|X| |X| | |X| |X| | | |X| | |X| | | | | | | |
+X|X| |X|X|X| | | |X| | | | |X| | | | |X|X|X|X|X| | |X|X|X| | |X|X|X|
+X| | | | | | | | |X| | | | |X| | | | |X| | |X| | | | | |X| | | | |X|
+X| | |X|X| |X|X|X|X| |X|X|X|X| |X|X|X|X| | |X| | | | | |X|X|X| | |X|
+X| | |X|X| | | |X| | |X| | | | |X| | | | | |X|X|X|X| | | | |X|X|X|X|
+X|X|X|X| | | |X|X| | |X|X|X|X|X|X| | | | | | | | |X| |X| | |X| | |X|
+ | | |X| | | |X|X|X|X|X| | |X| | | |X|X| | |X|X| |X| |X|X|X|X| | |X|
+X|X|X|X|X| | |X| | | | | | |X|X|X| | |X| | |X|X| |X| | | |X|X|X| |X|
+X|X| | |X|X|X|X| |X| | |X|X|X| | | | |X| | |X|X| | | | | |X| |X| | |
+X|X| | |X|X|X|X| |X|X|X|X| |X|X|X|X|X|X|X|X|X|X|X|X| |X|X|X| |X|X|X|
+CPU time 287.868 seconds.
+
+Picat> time(run(5))
+X|X|X| | | | |X|X| | | |X|X|X| | |X|X|X|X|X|X|X|X| |X|X|X|X|X|X| | |X|X|X|X|X|
+X| |X| |X|X|X|X|X| |X|X|X| |X| | | | | |X| | | |X| |X| | |X|X|X| | |X|X|X| | |
+X| |X| |X| | | |X|X|X| | | |X|X| |X|X|X|X| |X|X|X| | | | |X| | | | | | |X|X|X|
+X| |X| |X| | | | | | | |X|X|X|X| |X| | | | |X|X|X|X|X|X| |X| | | | | | | | |X|
+ | |X|X|X| | |X|X|X|X| |X| | | | |X|X|X|X| | | | | | |X| |X|X|X|X|X| | |X|X|X|
+X| | | | | | |X| | |X| |X| | | | | |X| |X|X|X| |X|X| |X| | | | | |X| | |X| |X|
+X|X|X|X|X| |X|X| | |X| |X|X|X|X|X| |X| |X|X|X| | |X| |X|X|X|X| | |X|X|X|X| |X|
+ | |X| | | |X|X|X| | | | | | | |X|X|X| | | |X|X|X|X| | | | |X|X|X|X| | | | | |
+ | |X| | | | | |X| | |X| |X|X| | | | | |X| |X| | | | |X|X| |X|X|X|X| |X|X|X|X|
+X|X|X|X|X|X| | |X| | |X| | |X| |X|X|X| |X| |X|X|X|X| |X|X| | | | | | |X|X| |X|
+X|X|X| | | | |X|X|X|X|X| | |X| | | |X| |X| | | | |X| | |X|X|X| |X| | | | | |X|
+X| | | | |X| | | | |X|X|X|X|X| |X|X|X| |X|X| |X| |X| | |X| |X| |X| | | |X|X|X|
+X| |X| | |X|X|X| | |X| | |X| | |X| |X| | |X| |X| |X|X|X|X| |X|X|X|X|X| |X| | |
+X| |X|X|X|X| |X| | | | | |X|X|X|X| |X|X|X|X| |X| | |X| | | |X| | | | | |X|X|X|
+X| | | | |X| |X|X|X|X| | |X|X| | | |X| | |X|X|X|X|X|X| | |X|X| | |X|X|X|X|X|X|
+X|X|X|X| | | | | |X|X|X|X|X|X| |X|X|X| | |X|X| | | | | | |X|X|X| |X|X|X| | | |
+ |X| |X| | |X|X| |X| | | | |X| | | | | | | | | |X|X|X| | | | |X| | | |X|X|X|X|
+ |X| | | | |X| | |X| | | | |X|X|X|X| | |X|X|X| |X| |X| | |X|X|X|X|X|X|X| |X|X|
+ |X|X| |X|X|X| |X|X| |X|X| | | | |X| | |X| | | |X| |X| | |X| | | |X| | | |X|X|
+X|X|X| |X| | | |X| | |X|X| |X| | |X|X|X|X| |X|X|X| |X|X|X|X| | | |X|X|X| | | |
+X| | | |X| | | |X| | |X|X|X|X| | | | | |X| |X| | | | | | | | |X|X|X| |X| | | |
+X| |X|X|X|X|X|X|X| | |X| | | | | | | | |X| |X| | |X| | |X| | |X|X| | |X|X|X|X|
+X| |X| | | | |X|X|X|X|X| | | | | |X|X| |X| | | | |X| | |X|X|X|X|X| | | | | |X|
+X| |X|X|X| | |X|X|X|X|X| |X|X|X| |X|X| | | |X| | |X| | | | | | |X|X|X|X| | |X|
+X| | | |X| | | | |X| | | |X| |X| |X|X|X|X|X|X|X|X|X|X|X| |X| | |X| | |X| |X|X|
+X| | | |X| | | | |X| | | |X| |X|X|X| | |X| | | |X| | |X| |X|X|X|X| | |X| |X|X|
+X|X|X|X|X|X|X|X| |X| |X|X|X| | | |X| | |X|X|X| |X| | | | |X|X|X|X| |X|X| | | |
+X| | | |X| | |X| | | |X| | | |X| | | | | | |X| |X|X|X|X| | | | | | |X|X|X|X|X|
+X| | | |X| | | | | | |X|X|X|X|X| |X|X|X|X|X|X| | | | |X| | |X| |X|X|X| | | |X|
+X| |X|X|X|X|X| |X|X|X|X| |X| | | | | |X| |X| | | | | |X| | |X| |X| | | | | |X|
+X| |X|X| | |X|X|X| | |X| |X| | |X| | |X| |X|X|X|X| |X|X|X|X|X| |X|X|X|X| | |X|
+X| |X|X| | | | |X| | | | |X|X| |X| |X|X| | | | |X| |X|X|X|X| | |X| |X|X| |X|X|
+X| | | | |X|X|X|X|X|X|X| | | | |X| | | | | |X| |X| | | | |X| | |X| |X|X| |X|X|
+X|X|X|X| |X|X| | |X| | | | |X|X|X| |X| |X|X|X| |X|X|X|X| |X|X| |X| | | | | | |
+ |X| |X| |X|X| | |X| | | | |X| | | |X| |X| | | | | | | | |X|X| | | |X|X|X|X|X|
+X|X| |X| | | | |X|X|X|X| | |X|X|X| |X|X|X|X|X|X|X| |X|X| | |X|X|X|X|X| |X| |X|
+X|X| |X|X|X|X| |X| | |X|X|X|X| |X| |X| | |X|X|X|X| |X|X| | |X|X|X|X|X| |X| |X|
+ | | | |X| | | |X| | |X| | |X| |X|X|X| | | | |X|X| |X|X| | |X|X| | | | |X| |X|
+ |X|X|X|X| |X|X|X| | |X| | |X| | | |X|X|X|X| |X|X| |X|X|X|X|X|X| |X|X|X|X| | |
+CPU time 314.087 seconds */
