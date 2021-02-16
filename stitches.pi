@@ -1,0 +1,42 @@
+/* LPCP Contest 2020 Problem 2: Stitches
+by Peter Bernschneider
+https://github.com/alviano/lpcp-contest-2020/tree/master/problem-2 */
+import util, sat.
+
+convert(Line) = map(Line.split(" "), to_int). % convert an input line to a list of integers
+
+run(Problem) =>
+    Inp = read_file_lines("instance." ++ to_string(Problem) ++ ".in"),
+    Params = Inp[1].convert(), N = Params[1], NumberOfStitches = Params[2],
+    Vr = Inp[2].convert(), Hr = Inp[3].convert(), % vertical and horizontal clues
+    Block = map(Inp[4..3+N], convert), Bmax = max(array_matrix_to_list(Block)),
+    M = new_array(N,N), M :: 0..4, % stitches
+    Ea = 1, We = 2, So = 3, No = 4, Chr = " ><v^", 
+    % Horizontal Stitch Ea-We as ><:
+    foreach(Z in 1..N, S in 1..N-1) M[Z,S] #= Ea #<=> M[Z,S+1] #= We end, 
+    % Vertical stitch So-No as v over ^:
+    foreach(Z in 1..N-1, S in 1..N) M[Z,S] #= So #<=> M[Z+1,S] #= No end, 
+    % Clues are there to impose the number of holes in each row and column of the grid:
+    foreach({Cnt,L} in zip(Hr,M.rows()) ++ zip(Vr,M.columns())) Cnt #= sum([(V #> 0) : V in L]) end,
+    % Connect all blocks to all its neighbor blocks with exactly NumberOfStitches stitches:
+    foreach(B1 in 1..Bmax-1, B2 in B1+1..Bmax)
+        PairsZ = [{Z,S} : Z in 1..N, S in 1..N-1, ((Block[Z,S]=B1, Block[Z,S+1]=B2); (Block[Z,S]=B2, Block[Z,S+1]=B1))],
+        PairsS = [{Z,S} : Z in 1..N-1, S in 1..N, ((Block[Z,S]=B1, Block[Z+1,S]=B2); (Block[Z,S]=B2, Block[Z+1,S]=B1))],
+        if len(PairsZ) + len(PairsS) > 0 then % if B1 and B2 are neighbors ..
+              sum([(M[Z,S] #= Ea) * (M[Z,S+1] #= We) : {Z,S} in PairsZ])
+            + sum([(M[Z,S] #= So) * (M[Z+1,S] #= No) : {Z,S} in PairsS]) #= NumberOfStitches
+        end
+    end,
+    solve(M), 
+    Horizontal = [{Z,S} : Z in 1..N, S in 1..N, M[Z,S]=Ea],
+    Vertical =   [{Z,S} : Z in 1..N, S in 1..N, M[Z,S]=So],
+    Out = open("instance." ++ to_string(Problem) ++ ".out", write),
+    writeln(Out, len(Horizontal)), foreach({Z,S} in Horizontal) writef(Out, "%d %d%n", Z, S) end,
+    writeln(Out, len(Vertical)),   foreach({Z,S} in Vertical)   writef(Out, "%d %d%n", Z, S) end,
+    close(Out),
+    foreach(Z in 1..N) 
+      foreach(S in 1..N)  printf("%c|", Chr[1+M[Z,S]] ) end, nl
+    end.
+
+main =>
+    foreach(P in 0..5) run(P) end. % CPU time 2.173 seconds
