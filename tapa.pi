@@ -1,0 +1,57 @@
+/* LPCP Contest 2020 Problem 3: Tapa
+by Peter Bernschneider
+https://github.com/alviano/lpcp-contest-2020/tree/master/problem-3 */
+import util, sat.
+
+convert(Line) = map(Line.split(" "), to_int). % convert an input line to a list of integers
+
+run(Problem) =>
+    Inp = read_file_lines("instance." ++ to_string(Problem) ++ ".in"),
+    Params = Inp[1].convert(), N = Params[1], NC = Params[2], % N = size of grid, NC = number of clue cells
+    Clues = map(Inp[2..1+NC], convert),
+    C = new_array(N,N), foreach(Z in 1..N, S in 1..N) C[Z,S] = [] end, % clues
+    foreach([Z,S,_|Sig] in Clues) C[Z,S] := Sig  end, println(C),
+    M = new_array(N,N), M :: [0,1],
+    foreach(Z in 1..N, S in 1..N, C[Z,S]!=[])
+        M[Z,S] #= 0,
+        L = [cond((0<Z1, Z1=<N, 0<S1, S1=<N), M[Z1,S1], 0) % everything beyond the border is 0
+            : {Z1,S1} in [{Z-1,S-1},{Z-1,S},{Z-1,S+1},{Z,S+1},{Z+1,S+1},{Z+1,S},{Z+1,S-1},{Z,S-1}]],
+        signatur(L, C[Z,S])
+    end,
+    % All black cells must be orthogonally connected:
+    Dist = new_array(N,N), DistVars = vars(Dist), MaxDist = N * N // 2, Dist :: 0..MaxDist,
+    Dist[4,1] #= 0, M[4,1] #= 1,
+    foreach(Z in 1..N, S in 1..N, (Z,S)!=(4,1))
+   	  	 M[Z,S] #= 1 #=> Dist[Z,S] #= 1 + min([ Dist[Z1,S1]*M[Z1,S1]+MaxDist*(0#=M[Z1,S1])
+   	  	 : (Z1,S1) in [(Z-1,S),(Z,S-1),(Z,S+1),(Z+1,S)], Z1 >= 1, Z1 =< N, S1 >= 1, S1 =< N])
+    end,
+    % 2x2 black areas must be avoided:
+    foreach(Z in 1..N-1, S in 1..N-1) M[Z,S] + M[Z,S+1] + M[Z+1,S] + M[Z+1,S+1] #< 4 end,
+    solve(vars(C) ++ vars(M) ++ DistVars), Chr = ".*",
+    Out = open("instance." ++ to_string(Problem) ++ ".out", write),
+    foreach(Z in 1..N)
+        Line = [Chr[1+M[Z,S]] : S in 1..N],
+        println(Line),
+        writeln(Out, Line.to_string()) 
+    end,
+    close(Out).
+
+main =>
+    foreach(P in 0..5) run(P) end. 
+/* 
+ */
+signatur(L, Blen) => % 8 cells in a circle
+    sum(L) #= sum(Blen), Bs = len(Blen),
+    Start = new_list(Bs), Start :: 0..7, all_different(Start), % block start, counting from 0
+    foreach(Block in 1..Bs)
+        if var(Blen[Block]) then 
+            J #= ((Start[Block] - 1) mod 8) + 1, element(J, L, 0), % starting with 0
+            J1 #=  Start[Block]            + 1, element(J1, L, 1)  % then one ore more 1´s
+        else
+            foreach(I in (-1)..Blen[Block]) % I counting in the block starting from 0
+                J #= (Start[Block]+I) mod 8 + 1, % J counting in L starting from 1
+                % before the block a 0, then Blen[Block] 1's, then a 0:
+                if I==(-1) then element(J, L, 0) elseif I<Blen[Block] then element(J, L, 1) else element(J, L, 0) end
+            end
+        end
+    end.
