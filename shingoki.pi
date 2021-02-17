@@ -1,0 +1,234 @@
+/* LPCP Contest 2020 Problem 5: Shingoki
+by Peter Bernschneider
+https://github.com/alviano/lpcp-contest-2020/tree/master/problem-5 */
+import util, sat.
+
+convert(Line) = map(Line.split(" "), to_int). % convert an input line to a list of integers
+
+run(Problem) =>
+    Inp = read_file_lines("instance." ++ to_string(Problem) ++ ".in"),
+    Params = Inp[1].convert(), N = Params[1] + 1, N1 = N + 1, 
+    NW = Params[2], NB = Params[3], % number of white and black circles
+    CoordW = map(Inp[2..1+NW], convert),
+    CoordB = map(Inp[2+NW..1+NW+NB], convert),
+    C = new_array(N,N), foreach(Z in 1..N, S in 1..N) C[Z,S] = 0 end, % constraints
+    foreach([Z,S,Cnt] in CoordB) C[1+Z,1+S] := Cnt  end, % Black point > 0
+    foreach([Z,S,Cnt] in CoordW) C[1+Z,1+S] := -Cnt end, % White point < 0
+    X = new_array(N1,N1), X :: [0,1], % X=1 iff the cell is inside the circuit
+    % Arround the given N x N grid we include a border of zeros:
+    foreach(Z in 1..N1) X[Z,1] #= 0, X[Z,N1] #= 0 end, % first and last column are only zeros
+    foreach(S in 1..N1) X[1,S] #= 0, X[N1,S] #= 0 end, % first and last row are only zeros
+    M = new_array(N,N), M :: 0..4, % M counts the X's in each 2x2 square
+    foreach(Z in 1..N, S in 1..N) M[Z,S] #= X[Z,S] + X[Z,S+1] + X[Z+1,S] + X[Z+1,S+1] end,
+    % The numeric clues are the sum of the lengths of the two straight lines going out of the associated circle.
+    % Measure the distance to the last turn L_eft, R_ight and so on:
+    DistL = new_array(N,N), DistL :: 0..N,
+    DistR = new_array(N,N), DistR :: 0..N,
+    DistH = new_array(N,N), DistH :: 0..N, 
+    DistT = new_array(N,N), DistT :: 0..N,
+    foreach(I in 1..N) DistL[I,1] #= 0, DistR[I,N] #= 0, DistH[1,I] #= 0, DistT[N,I] #= 0 end,
+    foreach(Z in 1..N, S in 2..N)
+        X[Z,S] #!= X[Z+1,S] #=> DistL[Z,S] #= DistL[Z,S-1] + 1,
+        X[Z,S] #=  X[Z+1,S] #=> DistL[Z,S] #= 0
+    end,
+    foreach(Z in 1..N, S in 1..N-1)
+        X[Z,S+1] #!= X[Z+1,S+1] #=> DistR[Z,S] #= DistR[Z,S+1] + 1,
+        X[Z,S+1] #=  X[Z+1,S+1] #=> DistR[Z,S] #= 0, 
+        abs(DistR[Z,S] - DistR[Z,S+1]) #=< 1 #\/ DistR[Z,S] #= 0
+    end,
+    foreach(Z in 2..N, S in 1..N)
+        X[Z,S] #!= X[Z,S+1] #=> DistH[Z,S] #= DistH[Z-1,S] + 1,
+        X[Z,S] #=  X[Z,S+1] #=> DistH[Z,S] #= 0
+    end,
+    foreach(Z in 1..N-1, S in 1..N)
+        X[Z+1,S] #!= X[Z+1,S+1] #=> DistT[Z,S] #= DistT[Z+1,S] + 1,
+        X[Z+1,S] #=  X[Z+1,S+1] #=> DistT[Z,S] #= 0
+    end,
+    foreach(Z in 1..N, S in 1..N)
+        if     C[Z,S]<0 then M[Z,S] #= 2                 % Constraint White Point
+        elseif C[Z,S]>0 then M[Z,S] #= 1 #\/ M[Z,S] #= 3 % Constraint Black Point
+        end,
+        if C[Z,S]!=0 then abs(C[Z,S]) #= DistL[Z,S] + DistR[Z,S] + DistH[Z,S] + DistT[Z,S] end
+    end,
+    % The circuit passes no cell more than once:
+	foreach(Z in 1..N, S in 1..N)
+		(X[Z,S] #= 1 #/\ X[Z+1,S+1] #= 1) #=> (X[Z,S+1] #= 1 #\/ X[Z+1,S] #= 1),
+		(X[Z,S+1] #= 1 #/\ X[Z+1,S] #= 1) #=> (X[Z,S]   #= 1 #\/ X[Z+1,S+1] #= 1)
+    end,
+    % The X's must be connected:  We define a root cell with distance 0 and measure the distance of each other cell.
+    % To avoid holes in the X-area also the outer area must be othogonally connected; here we chose (1,1) as root: 
+    Dist = new_array(N1,N1), MaxDist = N * N, Dist :: 0..MaxDist, 
+    Center = N // 2, [RootZ, RootS] :: Center-5..Center+5,
+    matrix_element(X, RootZ, RootS, 1), % the root cell for X is inside the circuit
+    matrix_element(Dist, RootZ, RootS, 0), Dist[1,1] #= 0,
+    foreach(Z in 1..N1, S in 1..N1, (Z,S)!=(1,1))
+   	  	(Z #!= RootZ #\/ S #!= RootS) #=>  
+            Dist[Z,S] #= 1 + min([ Dist[Z1,S1] * (X[Z,S] #= X[Z1,S1]) + MaxDist * (X[Z,S] #!= X[Z1,S1])
+   	  	    : (Z1,S1) in [(Z-1,S), (Z,S-1), (Z,S+1), (Z+1,S)], Z1 >= 1, Z1 =< N1, S1 >= 1, S1 =< N1])
+    end,
+    solve(vars(X) ++ vars(M) ++ vars(Dist) ++ vars(DistL) ++ vars(DistR) ++ vars(DistH) ++ vars(DistT)),  
+    printf("Problem %d:%n", Problem),
+    foreach(Z in 2..N, S in 2..N)
+		if X[Z,S]=1 then print("X|") else printf(" |") end, if S = N then nl end
+    end,
+    Horizontal = [{Z,S} : Z in 1..N, S in 1..N, X[Z,S]!=X[Z+1,S]],
+    Vertical =   [{Z,S} : Z in 1..N, S in 1..N, X[Z,S]!=X[Z,S+1]],
+    Out = open("instance." ++ to_string(Problem) ++ ".out", write),
+    writeln(Out, len(Horizontal)), foreach({Z,S} in Horizontal) writef(Out, "%d %d%n", Z-1, S-2) end,
+    writeln(Out, len(Vertical)),   foreach({Z,S} in Vertical)   writef(Out, "%d %d%n", Z-2, S-1) end,
+    close(Out).
+
+main =>
+    foreach(P in 0..5) run(P) end. 
+/* Problem 0:
+ |X| | |X|
+X|X|X|X|X|
+X| | |X| |
+X| | |X|X|
+X| |X|X| |
+
+Problem 1:
+X| | |X| |X| | | |X|
+X|X|X|X| |X|X|X|X|X|
+X| | |X| |X| | | |X|
+ | | |X|X|X| |X|X|X|
+ | | | | | | |X| | |
+X| | |X| | | |X| |X|
+X|X| |X|X|X|X|X| |X|
+ |X|X|X| | | |X| |X|
+ | |X| | | | |X|X|X|
+X|X|X|X|X|X| | | | |
+
+Problem 2:
+X|X|X| | |X|X|X|X| |X|X|X|X|X|X|X|X|X| |
+X| |X|X| | |X| |X| | | |X| | | | | |X|X|
+X| |X| | |X|X| |X|X| |X|X| |X|X|X| | | |
+X| |X|X| | |X| | |X|X|X| | | | |X| |X|X|
+X| | | | |X|X|X| | | |X| |X| | |X| | |X|
+X|X|X|X| |X| |X| |X| | | |X|X| |X|X|X|X|
+X| |X| | | | |X|X|X| |X| | |X| | | |X| |
+X| |X|X| |X| |X| |X|X|X|X| |X|X| | |X| |
+X| | |X|X|X|X|X| | | | |X| |X| | |X|X|X|
+X| |X|X| | | |X|X|X| |X|X| |X| | |X| |X|
+X| |X| | |X| | | |X| | | | |X| |X|X| |X|
+X| |X| | |X|X|X| |X|X| |X|X|X| |X| | |X|
+X| | | |X|X| |X| | |X| |X| | | |X| | |X|
+X| |X|X|X| | |X| |X|X| |X| |X|X|X|X| |X|
+X| |X| |X| |X|X| |X| | |X|X|X| | | | |X|
+X| | | | | | |X|X|X|X|X|X| | | |X| | |X|
+X| |X| |X| |X|X|X| |X| | | |X|X|X|X|X|X|
+X|X|X| |X| |X| |X| |X|X| | | | | |X| |X|
+ |X| | |X|X|X| |X| | | | |X| |X| | | |X|
+X|X| |X|X| |X| |X|X|X|X|X|X|X|X|X|X| |X|
+
+Problem 3:
+X|X| | | | | | |X|X|X|X|X|X| | | | | | |X| |X|X|X|X|X|X|X|X|
+ |X|X|X| | |X|X|X| | |X| |X| |X|X|X|X|X|X|X|X| |X| | | | | |
+ | | |X| | |X| |X| | |X| | | |X| | | |X| | | | |X| |X|X|X|X|
+ |X|X|X|X|X|X| |X|X| | | | |X|X|X|X| |X| | | | |X| |X| | |X|
+X|X| | | | | | |X| | | |X| | | | |X| |X| | |X|X|X| |X| | |X|
+ |X| |X| |X|X| |X|X| |X|X| | |X|X|X| |X|X| | |X| | |X| | |X|
+ |X| |X| |X| | | | | | |X|X| | |X| | | |X|X| | | | |X| | |X|
+X|X| |X| |X| |X|X|X|X| |X| | | |X| |X| | |X| |X|X|X|X| | |X|
+ |X| |X| |X| |X| | |X| |X| |X| |X| |X| | |X| |X| | | | | |X|
+ |X| |X| |X| |X| | | | |X| |X| |X|X|X|X| |X|X|X| | |X| |X|X|
+ |X| |X| |X| |X|X| |X|X|X|X|X| |X| | |X| | | | | |X|X| | |X|
+X|X|X|X|X|X| | |X| |X| | | | | | | | |X| |X| | | | |X| | |X|
+ |X| | |X| | | |X|X|X| |X|X| | |X|X|X|X|X|X|X|X|X| |X| |X|X|
+ |X| | | | | | |X| | | | |X| | | | |X| |X| |X| |X| |X| |X| |
+X|X|X| | |X| |X|X|X|X|X|X|X|X| | |X|X| |X| |X| |X| |X| |X| |
+ | |X|X| |X| |X| | |X| |X| |X|X| |X| | | | |X| |X| |X| |X| |
+ | | |X| |X| |X| |X|X| | | |X| | |X|X| |X|X|X| |X|X|X| |X| |
+X|X| |X| |X| |X| |X| | |X| |X|X| |X| | | | | | | |X| | |X| |
+ |X|X|X| |X| |X| |X|X|X|X| | |X|X|X| | | | | | | | | | |X| |
+X|X| |X| |X| |X| | |X| |X| | | | | | |X| |X|X|X| | |X| |X|X|
+ |X| |X|X|X|X|X| | | | |X|X| | |X| | |X| |X| |X| | |X|X|X| |
+ |X| | | | | |X|X| | | | |X|X|X|X|X|X|X|X|X| |X|X| |X| | | |
+ |X|X|X|X| | | | | |X| | | |X| | | |X| | | | | |X| |X|X|X|X|
+ | |X| |X|X| | |X|X|X|X|X| |X| | | |X| |X| |X|X|X| | | |X| |
+ | |X| | |X| |X|X| | | |X| | | |X|X|X| |X| |X| | | | |X|X| |
+X|X|X| | |X| | |X| | | |X| |X| |X| |X|X|X| | | | |X| |X| | |
+X| |X|X| |X| | |X|X|X| |X| |X|X|X| | | | | |X| | |X| |X|X|X|
+ | | |X| |X| | |X| |X| | | | | |X| | |X|X|X|X| | |X| | | |X|
+X| | |X| |X|X|X|X| |X|X| | |X|X|X|X| |X| | |X| | |X| | |X|X|
+X|X|X|X| | |X| | | | |X|X| |X| | |X|X|X| | |X| |X|X|X|X|X| |
+
+Problem 4:
+X|X|X| |X| | | |X|X|X|X|X|X|X| |X|X|X| |X| |X| | |X|X| |X| |X|X|X| |X|
+ |X| | |X|X|X|X|X| |X| | | |X| |X| |X|X|X|X|X|X|X|X| | |X|X|X| |X|X|X|
+ |X| | | | | | | | | | | | |X| |X| | |X| | |X| |X| | |X|X| |X| | |X| |
+X|X|X| | |X|X|X|X|X|X|X|X|X|X|X|X| |X|X| | |X| |X|X|X|X| | |X| | | | |
+X| |X|X|X|X| | | | | | | | | | | | | |X| |X|X| | |X| | | | |X|X| |X|X|
+X| |X| | |X| | | |X| |X|X|X| |X| | | | | | |X| | |X| | | | |X| | |X| |
+ | | | | | | | |X|X|X|X| |X|X|X| |X| |X|X|X|X| | |X| | |X|X|X|X|X|X| |
+X| | | |X|X| | | |X| |X| |X| |X|X|X|X|X| | |X| | |X| | |X| |X| | | | |
+X|X|X| |X| | |X| | | | | |X| | | | | | | | | | | |X| |X|X| |X|X|X|X|X|
+X| |X| |X|X| |X| |X|X| |X|X|X|X| |X|X| | |X| |X|X|X| | |X| |X| |X| |X|
+X| |X| |X| | |X| |X| | |X| | |X| | |X|X|X|X| | | | | | |X| | | |X| |X|
+X| |X| |X| |X|X| |X| | |X| | |X| |X|X| | |X|X|X|X|X|X|X|X|X|X| | | |X|
+X| |X| |X| | |X| |X| | |X|X| |X| |X| | | | | |X| | |X| | | |X| | | |X|
+X| |X| |X|X| |X|X|X|X|X|X| | |X| |X| |X|X|X|X|X| | | | |X|X|X|X| | |X|
+X| |X| | |X| | | |X| | | | | | | | | |X| | |X| | |X|X| | |X| |X|X| |X|
+X| |X| | |X| | |X|X|X| | | |X|X|X|X| |X| | |X|X| | |X| | | | |X| | |X|
+X| |X|X| |X| |X|X| |X| |X| |X| | |X| |X| | |X| | | |X|X|X| | |X| | |X|
+X| | |X| |X|X|X| | |X| |X| |X|X| |X|X|X| | |X|X| | | | |X|X|X|X|X| | |
+X| | |X| |X| |X| | |X| |X| | |X| | | | | |X|X| | |X| | | | | | |X|X| |
+X| |X|X| |X| |X| | |X| |X| | |X| |X| |X| | |X| |X|X|X|X| |X|X| | |X|X|
+X| |X| | | | |X| | | | |X|X| |X| |X| |X| | |X| |X| | |X| | |X| | |X| |
+X| |X| | |X| |X|X|X|X| | |X| |X| |X| |X|X|X|X| |X|X| |X|X|X|X|X|X|X| |
+X| |X| | |X| | | | |X| | |X| |X|X|X| |X| | |X| | | | |X| | | | | |X|X|
+X| |X| |X|X| | | | | | | |X| | |X| | |X| | |X| |X|X|X|X| | | | | | | |
+X| |X| | |X| |X|X|X| |X|X|X| |X|X|X| |X| |X|X| |X| | |X|X|X|X|X| |X| |
+X| |X| | |X| | | |X| |X| |X| |X| |X| | | |X| | | | | | | |X| |X|X|X|X|
+X| |X|X|X|X|X| | |X| |X| |X|X|X| |X|X|X| |X| |X|X|X| |X|X|X| | |X| |X|
+X| |X| |X| | | |X|X|X|X| | | | | |X| | | |X| | | |X| |X| |X| | |X| |X|
+X| | | | | | | | | | | | | |X| | |X|X| |X|X|X| | |X| |X| |X| | |X| | |
+X| | |X|X|X| |X| | |X|X|X|X|X| | | | | |X| |X|X| |X| |X| |X|X| |X|X|X|
+X| | |X| |X|X|X|X|X|X| | | |X|X|X|X| |X|X| | | | |X| |X| | |X| | |X| |
+X| |X|X| | | | | | | | | | |X| | |X| | |X|X|X|X|X|X| |X| |X|X| |X|X| |
+X| |X| | |X| |X| |X|X|X|X| |X|X| |X|X|X|X| | | |X| | |X| |X| | | |X|X|
+X|X|X| |X|X|X|X|X|X| | |X| | |X| | |X| | | | |X|X|X| |X| |X|X|X| | |X|
+X| |X| | |X| |X| |X| |X|X|X|X|X| | |X| |X|X|X|X| |X| |X| |X| |X| | |X| 
+
+Problem 5:
+X|X| |X|X|X| |X|X|X|X|X| |X|X| | |X| |X| | |X| |X|X|X| | |X|X|X|X| |X| |X|X|X| |
+X| | |X| |X| | |X| | |X| | |X|X|X|X|X|X|X| |X|X|X| |X| | |X| | |X|X|X|X|X| |X|X|
+X|X|X|X| |X|X| | | | |X| | |X| |X| | | |X| | | |X| |X|X| |X|X| | | | | |X| |X| |
+X| | |X| | |X|X|X| |X|X| |X|X| |X| | | |X| | | |X| | | | | | | |X|X|X|X|X| |X|X|
+X| | |X| | | | |X| |X| | |X| | |X| | |X|X| |X| |X|X|X| |X|X| | |X| | | |X| | |X|
+ | | |X| | | | | | |X|X| | | |X|X|X| |X| | |X| | |X| | | |X|X|X|X|X| | |X|X| |X|
+X|X|X|X|X|X|X|X|X| |X| | |X|X|X| | | |X|X| |X|X| |X|X|X| |X| | | | | | | | | | |
+ |X| | | |X| | | | |X| | | | |X|X|X| | |X| | |X| |X| |X| |X| | |X|X| |X| |X| |X|
+X|X|X| | | | | | | |X|X|X|X| |X| |X| |X|X|X| |X| | | |X|X|X|X| | |X| |X| |X|X|X|
+ | |X| | |X|X|X| | | | | |X| | | |X| |X| |X| |X| | | |X| | | | |X|X| |X| |X| |X|
+ | |X| | |X| |X| |X|X| | |X| |X|X|X| | | |X| |X|X|X| |X|X|X|X| | |X| |X| |X| |X|
+ |X|X| |X|X| |X| | |X| | |X| | |X| | |X|X|X| |X| |X| | | | |X| |X|X|X|X| |X| | |
+ | |X| | |X| |X|X|X|X|X|X|X| | |X| |X|X| | | |X| |X| |X|X|X|X| |X| | |X| |X| |X|
+X|X|X| |X|X| | | | | | | |X| |X|X| | |X| |X| | | |X| |X| | |X| |X| | |X| |X|X|X|
+X| |X| | |X| |X|X|X| | | |X|X|X| | | |X|X|X| | | |X| | | | |X| |X| |X|X| | |X| |
+X| |X|X|X|X| |X| |X|X| | |X| | | |X| | |X| | | |X|X|X|X| | |X| |X| | |X| | |X| |
+ | | | |X| | |X| | |X| | |X| | |X|X| |X|X| |X|X|X| | |X| |X|X|X|X| | |X|X|X|X|X|
+X|X|X| | | | |X| | |X| | |X|X| | |X| |X| | | | |X| | |X| | | | | | | | |X| | | |
+X| |X| | | | |X| | |X|X| | |X| |X|X| |X| |X| |X|X| | | | |X|X|X|X|X|X| |X| | | |
+ | |X|X|X|X| |X| | |X| | | |X|X|X| | |X| |X|X|X| | | |X| | | | | |X| | |X|X|X|X|
+X|X|X| | | | |X| | |X| | | |X| |X| |X|X| | |X| | |X|X|X| | |X| | |X|X| | |X| | |
+ |X| | | |X| | | | |X| | |X|X| |X| | | | | |X| | |X| |X| |X|X| |X|X| | | |X| |X|
+ |X| | | |X| | | |X|X|X|X|X| | |X| |X| | |X|X| | |X| |X| | |X| | |X| | |X|X| |X|
+X|X|X| |X|X| |X| | | | | | | | |X|X|X| | | |X| |X|X| |X|X|X|X| |X|X| | |X| | |X|
+X| |X| |X| | |X|X| |X|X|X|X| | | | |X|X|X|X|X|X|X| | | | | | | | |X|X|X|X| | |X|
+X| |X| |X| | | |X| |X| | |X|X|X|X|X|X|X| | |X| | | | | |X|X| | | | | |X| | | |X|
+X| |X|X|X|X|X| |X| |X| | | |X| |X| | |X|X| |X| | | |X|X|X| | | |X|X| |X| | |X|X|
+X| | |X| | | | |X|X|X| |X| | | | | |X|X| | |X|X|X| | | |X|X| |X|X| | |X|X|X|X| |
+X|X| |X| | | | | | |X| |X| |X| | | | | | | |X| |X| |X| | |X| | |X| |X|X|X| |X|X|
+X| | |X|X|X|X|X|X|X|X| |X|X|X|X|X|X| | | |X|X| |X|X|X|X|X|X| |X|X| |X| |X| | |X|
+ | | | | | | | | | |X| | | | |X| |X|X|X| |X| | |X| | | |X| | |X| | |X| | | | | |
+ |X| |X|X|X| | | | |X| |X| | | | |X| |X| |X| | | | |X|X|X| | |X| | |X| | |X| | |
+X|X| |X| |X|X| |X|X|X| |X| |X| | |X| |X| |X|X|X|X| | | |X| | |X|X|X|X| |X|X|X|X|
+ |X| |X| |X| | |X| |X| |X|X|X|X|X|X| |X| | |X| |X| | |X|X| | |X| | |X| |X| | | |
+ |X| |X| |X| | |X| |X| |X| | | | | | |X|X|X|X| |X|X| | |X|X|X|X| | | | |X| | |X|
+X|X|X|X| |X|X|X|X| |X| |X|X| | | | | |X| | | | | | | | |X| | |X| |X| |X|X|X| |X|
+X| | | | | |X| |X| |X| |X| | |X|X|X| | | | | |X| |X|X| |X| | |X|X|X|X|X| |X| |X|
+X|X| |X|X| |X| | | |X| |X| |X|X| | | | |X| |X|X| | |X| |X|X| |X| |X| | | |X|X|X|
+X| | | |X|X|X| |X| |X| |X|X|X| | | |X| |X| | |X|X|X|X| | |X| |X| |X| |X| | |X| |
+X|X|X| | |X| | |X|X|X| | | |X|X|X|X|X| |X|X|X|X| | |X|X|X|X| |X| |X|X|X| | |X|X|
+CPU time 1056.03 seconds at MacBook Air */
