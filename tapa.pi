@@ -38,8 +38,14 @@ run(Problem) =>
 
 main =>
     foreach(P in 0..5) run(P) end. 
-/* 
- */
+/* time(run(10))
+.*.*.*
+**.*.*
+*..***
+*.**.*
+***.**
+*.*.*.
+CPU time 0.751 seconds */
 signatur(L, Blen) => % 8 cells in a circle
     sum(L) #= sum(Blen), Bs = len(Blen),
     Start = new_list(Bs), Start :: 0..7, all_different(Start), % block start, counting from 0
