@@ -1,0 +1,78 @@
+/* Masyu subcircuit_grid Nr.1 
+/* LPCP Contest 2020 Problem 4: Masyu based on subcircuit_grid
+by Peter Bernschneider
+https://github.com/alviano/lpcp-contest-2020/tree/master/problem-4 */
+import sat, util. 
+convert(Line) = map(Line.split(" "), to_int). % convert an input line to a list of integers
+
+run(Problem) =>
+    Inp = read_file_lines("instance." ++ to_string(Problem) ++ ".in"),
+    Params = Inp[1].convert(), N = Params[1] + 1,
+    NW = Params[2], NB = Params[3], % number of white and black circles
+    CoordW = map(Inp[2..1+NW], convert), 
+    CoordB = map(Inp[2+NW..1+NW+NB], convert),
+    M = new_array(N,N), M :: 0..1, subcircuit_grid(M),
+    H = new_array(N,N-1), H :: 0..1, % horizontal connection
+    V = new_array(N-1,N), V :: 0..1, % vertical connection
+    foreach(Z in 1..N, S in 1..N)
+        NbH #= sum([H[Z,S1] : S1 in [S-1,S], 0<S1, S1<N]),
+        NbV #= sum([V[Z1,S] : Z1 in [Z-1,Z], 0<Z1, Z1<N]),
+        Nb #= NbH + NbV, Nb :: [0,2],
+        M[Z,S] #= 1 #<=> Nb #= 2,
+        if membchk([Z-1,S-1], CoordB) then % Black circle: straight - turn - straight
+            M[Z,S] #= 1,
+            NbH #= 1, NbV #= 1,
+            if S=<2 then 1 #= (H[Z,S] + H[Z,S+1] #= 2) 
+                elseif S>=N-2 then 1 #= (H[Z,S-2] + H[Z,S-1] #= 2)
+                else 1 #= ((H[Z,S] + H[Z,S+1] #= 2) #\/ (H[Z,S-2] + H[Z,S-1] #= 2))
+            end,
+            if Z=<2 then 1 #= (V[Z,S] + V[Z+1,S] #= 2) 
+                elseif Z>=N-2 then 1 #= (V[Z-2,S] + V[Z-1,S] #= 2)
+                else 1 #= ((V[Z,S] + V[Z+1,S] #= 2) #\/ (V[Z-2,S] + V[Z-1,S] #= 2))
+            end
+        elseif membchk([Z-1,S-1], CoordW) then % White circle: (turn -) straight - straight (- turn)
+            M[Z,S] #= 1,
+            if 1<Z, Z<N then Vr #= (NbV #= 2 #/\ sum([H[Z1,S1] : (Z1,S1) in [(Z-1,S-1),(Z-1,S),(Z+1,S-1),(Z+1,S)], 0<S1, S1<N, 0<Z1, Z1=<N]) #> 0) else Vr #= 0 end,
+            if 1<S, S<N then Hr #= (NbH #= 2 #/\ sum([V[Z1,S1] : (Z1,S1) in [(Z-1,S-1),(Z,S-1),(Z-1,S+1),(Z,S+1)], 0<Z1, Z1<N, 0<S1, S1=<N]) #> 0) else Hr #= 0 end,
+            Vr + Hr #= 1
+        end
+    end,
+    solve(vars(M) ++ vars(H) ++ vars(V)), Mchr = " *", Hchr = " -", Vchr = " |",
+    foreach(Z in 1..N)
+    	foreach(S in 1..N)
+            if membchk([Z-1,S-1], CoordB)         then print("B")
+                elseif membchk([Z-1,S-1], CoordW) then print("W")
+                else printf("%c", Mchr[1+M[Z,S]]) 
+            end, 
+            if S<N then printf("%c", Hchr[1+H[Z,S]]) end
+        end, nl,
+        if Z<N then foreach(S in 1..N) printf("%c ", Vchr[1+V[Z,S]]) end, nl end
+    end.
+/* run(10)
+    *-*    
+    | |     
+*-* * *-W-*
+| | |     | 
+* W B-*-B *
+| |     | | 
+* *     * *
+| |     | | 
+* B-*-*-B W
+|         | 
+*-W-*-*-W-*
+CPU time 0.498 seconds.
+run(0)
+      *-*-*
+      |   | 
+B-*-W-*   W
+|         | 
+W B-*-*-W-*
+| |         
+* *   *-*  
+| |   | |   
+* B-*-* *  
+|       |   
+*-*-*-W-B  
+CPU time 0.118 seconds
+run(1)
+not terminating */
