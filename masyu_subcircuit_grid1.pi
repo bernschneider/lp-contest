@@ -1,5 +1,5 @@
-/* Masyu subcircuit_grid No. 2
-/* LPCP Contest 2020 Problem 4: Masyu based on subcircuit_grid/3
+/* Masyu_subcircuit_grid1: modified version based on subcircuit_grid/3
+/* LPCP Contest 2020 Problem 4: Masyu 
 by Peter Bernschneider
 https://github.com/alviano/lpcp-contest-2020/tree/master/problem-4 */
 import sat, util. 
