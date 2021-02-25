@@ -21,10 +21,10 @@ run(Problem) =>
     % All black cells must be orthogonally connected:
     Dist = new_array(N,N), DistVars = vars(Dist), MaxDist = N * N // 2, Dist :: 0..MaxDist,
     [RootZ, RootS] :: 1..N,
-    matrix_element(M, RootZ, RootS, 1), % the root cell is inside the circuit
-    matrix_element(Dist, RootZ, RootS, 0), Dist[1,1] #= 0,
-    foreach(Z in 1..N, S in 1..N, (Z,S)!=(1,1))
-   	  	 (Z #!= RootZ #\/ S #!= RootS) #/\ M[Z,S] #= 1
+    matrix_element(M, RootZ, RootS, 1), % the root cell is 1
+    matrix_element(Dist, RootZ, RootS, 0),
+    foreach(Z in 1..N, S in 1..N)
+        ((Z #!= RootZ #\/ S #!= RootS) #/\ M[Z,S] #= 1)
             #=> Dist[Z,S] #= 1 + min([ Dist[Z1,S1]*M[Z1,S1]+MaxDist*(0#=M[Z1,S1])
    	  	                               : (Z1,S1) in [(Z-1,S),(Z,S-1),(Z,S+1),(Z+1,S)], Z1 >= 1, Z1 =< N, S1 >= 1, S1 =< N])
     end,
@@ -32,6 +32,7 @@ run(Problem) =>
     foreach(Z in 1..N-1, S in 1..N-1) M[Z,S] + M[Z,S+1] + M[Z+1,S] + M[Z+1,S+1] #< 4 end,
     solve(vars(C) ++ vars(M) ++ DistVars), Chr = ".*",
     Out = open("instance." ++ to_string(Problem) ++ ".out", write),
+    printf("Instance %d:%n", P),
     foreach(Z in 1..N)
         Line = [Chr[1+M[Z,S]] : S in 1..N],
         println(Line),
