@@ -13,12 +13,17 @@ main =>
     foreach([R, C] in Plan)
         printf("%d %d\n", R, C)
     end. 
-/* all instances except instance 8 are terminating and accepted by Checker.py */
+/* all instances beside instance 8 terminate and are accepted by Checker.py */
 
 final(State) =>
     State = [M,_,_],
     N = len(M),
     foreach(R in 1..N, C in 1..N) M[R,C] = 1 end.
+
+heuristic(S) = Dist =>
+    S = [M0,R0,C0], 
+    N = len(M0),
+    Dist = sum([cond(M0[R0, C] = 0, 1, 0) : C in 1..N]) + sum([cond(M0[R, C0] = 0, 1, 0) : R in 1..N]). % jump to a point with many possible jump targets
 
 action(S, NextS, Action, Cost) =>
     S = [M,R0,C0],
@@ -27,7 +32,7 @@ action(S, NextS, Action, Cost) =>
     M[R,C] = 0,
     Action = [R,C],
     Cost = 1,
-    M1 = {{cond((R1 = R, C1 = C), 1, M[R1,C1]) : C1 in 1..N} : R1 in 1..N},
+    M1 = copy_term(M), M1[R,C] := 1,
     NextS = [M1,R,C]. 
 
 convert(Line) = {to_int(Str) : Str in Line.split(" ")}. % convert an input line to an array of integers
