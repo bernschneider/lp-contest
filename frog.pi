@@ -13,7 +13,7 @@ main =>
     foreach([R, C] in Plan)
         printf("%d %d\n", R, C)
     end. 
-/* all instances accepted by Checker.py */
+/* all instances except instance 8 are terminating and accepted by Checker.py */
 
 final(State) =>
     State = [M,_,_],
