@@ -1,0 +1,28 @@
+/* LPCP Contest 2021 Problem 1: Jumpoing frog - using constraint hcp from Picat 3.1
+by Peter Bernschneider, 24 Sep 2021
+https://github.com/alviano/lpcp-contest-2021/tree/main/problem-1 */
+import util, io, sat.
+
+convert(Line) = [to_int(Str) : Str in Line.split(" ")]. % convert an input line to a list of integers
+
+main =>
+    main(["instance.0.in"]).
+    
+main([File]) =>
+    Inp = read_file_lines(File), 
+    [N,R0,C0] = Inp[1].convert(), % println([N,R0,C0]), % S = size of grid, (R0,C0) = frog starts here
+    Obs = [convert(Inp[1+Row]) : Row in 1..N], % println(Obs),
+    Vs = [{(R,C), 1 - Obs[R,C]} : R in 1..N, C in 1..N], % all fields without n obstacle are vertices
+    Es = [{(R,C), (R,C1), _} : R in 1..N, C in 1..N, C1 in 1..N, C1 != C, Obs[R,C1] = 0] ++
+         [{(R,C), (R1,C), _} : R in 1..N, C in 1..N, R1 in 1..N, R1 != R, Obs[R1,C] = 0],
+    hcp(Vs, Es),
+    solve(vars(Es)), 
+    E1 = [{(R1,C1), (R2,C2)} : {(R1,C1), (R2,C2), 1} in Es], %println(E1),
+    R = R0, C = C0,
+    printf("%d%n", len(E1) - 1),
+    do
+        Next = [(R2,C2) : {(R,C), (R2,C2)} in E1],
+        (Rnext,Cnext) = Next[1],
+        R := Rnext, C := Cnext,
+        printf("%d %d%n", R, C)
+    while((R,C) != (R0,C0)).
