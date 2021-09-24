@@ -34,41 +34,29 @@ main([File]) =>
         if     Typ[R,C] = 1 then % long pipe
             Res = cond(2 = sum([EMap.get({R,C,R1,C}) : R1 in [R-1, R+1], 0<R1, R1=<N]), 1, 0),
             Nrot = (Res - Rot[R,C]) mod 2,
-            if (Res - Rot[R,C]) mod 2 = 1 then printf("%d %d%n", R, C) end
+            if Nrot = 1 then printf("%d %d%n", R, C) end
         elseif Typ[R,C] = 2 then % corner pipe
             Right = cond( C < N, EMap.get({R,C,R,C+1}), 0),
             Down  = cond( R < N, EMap.get({R,C,R+1,C}), 0),
             Nrot = (2 * Right + Down - Rot[R,C]) mod 4,
             foreach(_ in 1..Nrot) printf("%d %d%n", R, C) end
         elseif Typ[R,C] = 3 then % closed
-            if     C < N, EMap.get({R,C,R,C+1}) = 1 then Res = 0 
-            elseif R < N, EMap.get({R,C,R+1,C}) = 1 then Res = 1 
-            elseif 1 < C, EMap.get({R,C-1,R,C}) = 1 then Res = 2 
-            elseif 1 < R, EMap.get({R,C,R-1,C}) = 1 then Res = 3
+            if     (C = N; EMap.get({R,C,R,C+1}) = 1) then Res = 0 
+            elseif (R = N; EMap.get({R,C,R+1,C}) = 1) then Res = 1 
+            elseif (C = 1; EMap.get({R,C-1,R,C}) = 1) then Res = 2 
+            elseif (R = 1; EMap.get({R,C,R-1,C}) = 1) then Res = 3
+            else printf("Error at %d|%d%n", R, C)
             end, 
             Nrot = (Res - Rot[R,C]) mod 4,
             foreach(_ in 1..Nrot) printf("%d %d%n", R, C) end
         elseif Typ[R,C] = 5 then % T pipe
-            if     1 < R, EMap.get({R,C,R-1,C}) = 0 then Res = 0
-            elseif C < N, EMap.get({R,C,R,C+1}) = 0 then Res = 1 
-            elseif R < N, EMap.get({R,C,R+1,C}) = 0 then Res = 2 
-            elseif 1 < C, EMap.get({R,C-1,R,C}) = 0 then Res = 3
+            if     (R = 1; EMap.get({R,C,R-1,C}) = 0) then Res = 0
+            elseif (C = N; EMap.get({R,C,R,C+1}) = 0) then Res = 1 
+            elseif (R = N; EMap.get({R,C,R+1,C}) = 0) then Res = 2 
+            elseif (C = 1; EMap.get({R,C-1,R,C}) = 0) then Res = 3
+            else printf("Error at %d|%d Typ %d%n", R, C, TypOri[R,C])
             end, 
             Nrot = (Res - Rot[R,C]) mod 4,
             foreach(_ in 1..Nrot) printf("%d %d%n", R, C) end
         end
-    end. /*
-4
-1 1
-1 1
-1 1
-1 2
-1 2
-1 2
-2 1
-2 3
-3 1
-3 1
-3 2
-3 2
-*** error(instantiation_error,(-)/2) */
+    end.
