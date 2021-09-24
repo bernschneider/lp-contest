@@ -15,7 +15,6 @@ main([File]) =>
     Typ    = [[TypOri[R,C] div 10 : C in 1..N ] : R in 1..N], % 1 = long pipe, 2 = corner, 3 = closed, 5 = T pipe
     Rot    = [[TypOri[R,C] mod 10 : C in 1..N ] : R in 1..N], % no of rotations
     Vs = [{(R,C), 1} : R in 1..N, C in 1..N], % all cells are connected!
-    % Es = [{(R,C), (R1,C1), _} : R in 1..N, C in 1..N, (R1,C1) in [(R-1,C), (R,C-1), (R,C+1), (R+1,C)], 0<R1, R1=<N, 0<C1, C1=<N],
     Es = [{(R,C), (R1,C1), _} : R in 1..N, C in 1..N, (R1,C1) in [(R,C+1), (R+1,C)], 0<R1, R1=<N, 0<C1, C1=<N],    
     EMap = new_map(), foreach({(R,C), (R1,C1), B} in Es) EMap.put({R,C,R1,C1}, B), EMap.put({R1,C1,R,C}, B) end, % , EMap.put({R1,C1,R,C}, B)
     Nbcnt = [2,2,1,0,3], % Nbcnt[Typ[R,C]] = number of neighbors connected to R|C 
