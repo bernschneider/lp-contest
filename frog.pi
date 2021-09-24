@@ -3,32 +3,31 @@ by Peter Bernschneider, 24 Sep 2021
 https://github.com/alviano/lpcp-contest-2021/tree/main/problem-1 */
 import util, io, planner, sat.
 
-convert(Line) = {to_int(Str) : Str in Line.split(" ")}. % convert an input line to a list of integers
+main =>
+    Inp = read_file_lines(), 
+    {N,R0,C0} = Inp[1].convert(), % N = size of grid, (R0,C0) = frog starts here
+    M0 = {convert(Inp[1+Row]) : Row in 1..N}, M0[R0,C0] := 1, 
+    S0 = [M0,R0,C0], 
+    plan(S0,Plan),
+    println(len(Plan)),
+    foreach([R, C] in Plan)
+        printf("%d %d\n", R, C)
+    end. 
+/* all instances accepted by Checker.py */
 
 final(State) =>
-    State = (M,_,_),
+    State = [M,_,_],
     N = len(M),
     foreach(R in 1..N, C in 1..N) M[R,C] = 1 end.
 
 action(S, NextS, Action, Cost) =>
-    S = (M,R0,C0),
+    S = [M,R0,C0],
     N = len(M),
     between(1, N, R), between(1, N, C), (R = R0; C = C0),
     M[R,C] = 0,
     Action = [R,C],
     Cost = 1,
     M1 = {{cond((R1 = R, C1 = C), 1, M[R1,C1]) : C1 in 1..N} : R1 in 1..N},
-    NextS = (M1,R,C). 
+    NextS = [M1,R,C]. 
 
-main(Problem) =>
-    % Inp = read_file_lines(), 
-    Inp = read_file_lines("instance." ++ to_string(Problem) ++ ".in"), 
-    [N,R0,C0] = Inp[1].convert(), % N = size of grid, (R0,C0) = frog starts here
-    M0 = {convert(Inp[1+Row]) : Row in 1..N}, % println(M0),
-    S0 = (M0,R0,C0),
-    plan(S0,Plan),
-    println(len(Plan)),
-    foreach([R, C] in Plan)
-        printf("%d %d\n", R, C)
-    end. /*
-no solution */
+convert(Line) = {to_int(Str) : Str in Line.split(" ")}. % convert an input line to an array of integers
