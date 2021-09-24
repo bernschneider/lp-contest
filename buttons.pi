@@ -1,0 +1,39 @@
+import planner, util.
+
+read_input() = [N, C, S] => 
+  [N, C] = [X.to_int() : X in readln().split()],
+  S = new_array(N),
+  foreach (I in 1..N)
+    S[I] = {X.to_int() : X in readln().split()}
+  end.
+
+final(S) => max([max(X) : X in S]) == 0.
+
+action(S, NextS, Action, Cost) =>
+    N = len(S),
+    between(1,N,I0), between(1,N,J0), between(1,N,I1), between(1,N,J1),
+    (I0 = I1; J0 = J1; I0 + J0 = I1 + J1; I0 - J0 = I1 - J1),
+    S[I0,J0] > 0, S[I1,J1] > 0, (I0,J0) != (I1,J1),
+    StepR = sign(I1 - I0), StepC = sign(J1 - J0),
+    NextS = copy_term(S), 
+    NextS[I0,J0] := 0,
+    I = I0, J = J0,
+    while((I,J) != (I1,J1))
+        I := I + StepR, J := J + StepC,
+        (S[I,J] = 0; S[I,J] = S[I0,J0]),
+        NextS[I,J] := 0   
+    end,
+    Action = [[I0, J0], [I1, J1]],
+    Cost = 1.
+
+heuristic(S) = Dist =>
+    N = len(S),
+    Dist = sum([cond(S[I, J] > 0, 1, 0) : I in 1..N, J in 1..N]).
+
+main() =>
+  [N, C, S] = read_input(),
+  plan(S,Plan),
+  println(len(Plan)),
+  foreach([[I1, J1], [I2, J2]] in Plan)
+    printf("%d %d %d %d\n", I1, J1, I2, J2),
+  end.
