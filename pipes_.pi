@@ -28,27 +28,31 @@ main([File]) =>
     end,
     scc(Vs, Es), % all 1 cells are connected, a new global constraint in Picat version 3.1
     solve(values(EMap)), 
-    % E1 = [{(R1,C1), (R2,C2)} : {(R1,C1), (R2,C2), 1} in Es], println(E1),
-    println(N),
+    Output = [],
     foreach(R in 1..N, C in 1..N)
         if     Typ[R,C] = 1 then % long pipe
             Res = cond(2 = sum([EMap.get({R,C,R1,C}) : R1 in [R-1, R+1], 0<R1, R1=<N]), 1, 0),
             Nrot = (Res - Rot[R,C]) mod 2,
-            if Nrot = 1 then printf("%d %d%n", R, C) end
+            if Nrot = 1 then Output := Output ++ [[R, C]] end
         elseif Typ[R,C] = 2 then % corner pipe
-            Right = cond( C < N, EMap.get({R,C,R,C+1}), 0),
-            Down  = cond( R < N, EMap.get({R,C,R+1,C}), 0),
-            Nrot = (2 * Right + Down - Rot[R,C]) mod 4,
-            foreach(_ in 1..Nrot) printf("%d %d%n", R, C) end
+            Right = cond( C = N, 0, EMap.get({R,C,R,C+1})),
+            Down  = cond( R = N, 0, EMap.get({R,C,R+1,C})),
+            if     Right = 0, Down = 1 then Res = 0
+            elseif Right = 0, Down = 0 then Res = 1
+            elseif Right = 1, Down = 0 then Res = 2
+            elseif Right = 1, Down = 1 then Res = 3
+            end,            
+            Nrot = (Res - Rot[R,C]) mod 4,
+            foreach(_ in 1..Nrot) Output := Output ++ [[R, C]] end
         elseif Typ[R,C] = 3 then % closed
-            if     (C = N; EMap.get({R,C,R,C+1}) = 1) then Res = 0 
-            elseif (R = N; EMap.get({R,C,R+1,C}) = 1) then Res = 1 
-            elseif (C = 1; EMap.get({R,C-1,R,C}) = 1) then Res = 2 
-            elseif (R = 1; EMap.get({R,C,R-1,C}) = 1) then Res = 3
+            if     (C < N, EMap.get({R,C,R,C+1}) = 1) then Res = 0 
+            elseif (R < N, EMap.get({R,C,R+1,C}) = 1) then Res = 1 
+            elseif (C > 1, EMap.get({R,C-1,R,C}) = 1) then Res = 2 
+            elseif (R > 1, EMap.get({R,C,R-1,C}) = 1) then Res = 3
             else printf("Error at %d|%d%n", R, C)
             end, 
             Nrot = (Res - Rot[R,C]) mod 4,
-            foreach(_ in 1..Nrot) printf("%d %d%n", R, C) end
+            foreach(_ in 1..Nrot) Output := Output ++ [[R, C]] end
         elseif Typ[R,C] = 5 then % T pipe
             if     (R = 1; EMap.get({R,C,R-1,C}) = 0) then Res = 0
             elseif (C = N; EMap.get({R,C,R,C+1}) = 0) then Res = 1 
@@ -57,6 +61,10 @@ main([File]) =>
             else printf("Error at %d|%d Typ %d%n", R, C, TypOri[R,C])
             end, 
             Nrot = (Res - Rot[R,C]) mod 4,
-            foreach(_ in 1..Nrot) printf("%d %d%n", R, C) end
+            foreach(_ in 1..Nrot) Output := Output ++ [[R, C]] end
         end
-    end.
+    end,
+    println(len(Output)),
+    foreach([R, C] in Output)
+        printf("%d %d%n", R, C)
+    end. 
